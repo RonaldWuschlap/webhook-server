@@ -1,0 +1,25 @@
+# Webhook Server Configuration
+
+# Define the port the server listens on
+port: 5000
+
+# Define endpoints and their actions
+endpoints:
+  - path: /webhook/deploy
+    method: POST
+    actions:
+      - type: script
+        command: "echo 'Deploying...'"
+        # You can use arguments from the payload using {key} syntax if implemented
+        # command: "./deploy.sh {branch}" 
+
+  - path: /webhook/notify
+    method: POST
+    actions:
+      - type: api
+        url: "https://httpbin.org/post"
+        method: POST
+        headers:
+          Content-Type: application/json
+        payload:
+          message: "Notification received"
