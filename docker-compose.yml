@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  webhook-server:
+    build: .
+    container_name: webhook-server
+    ports:
+      - "5000:5000"
+    volumes:
+      # Mount config file to allow easy updates without rebuilding
+      - ./config.yaml:/app/config.yaml:ro
+    restart: unless-stopped
+    environment:
+      - FLASK_ENV=production
+    networks:
+      - webhook-network
+
+networks:
+  webhook-network:
+    driver: bridge
