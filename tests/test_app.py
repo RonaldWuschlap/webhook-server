@@ -1,6 +1,7 @@
 import pytest
 from app.main import app
 from unittest.mock import patch, MagicMock
+import time
 
 @pytest.fixture
 def client():
@@ -151,3 +152,22 @@ def test_jellyfin_api_error_503(client, mock_api_client_factory):
     data = response.json
     assert data['status'] == 'error'
     assert 'API call failed' in data['message']
+
+def test_sonarr_library_update_throttled(client, mock_api_client_factory):
+    """Test Sonarr library update throttling."""
+    payload = {
+        "eventType": "Download",
+        "series": {"title": "Test Series"},
+        "episodes": [{"title": "Test Episode"}]
+    }
+    
+    response = client.post('/webhook/sonarr', json=payload)
+    assert response.status_code == 200
+    data = response.json
+    assert data['status'] == 'success'
+
+    response = client.post('/webhook/sonarr', json=payload)
+    assert response.status_code == 200
+    data = response.json
+    assert data['status'] == 'ignored'
+    assert 'Library update throttled' in data['message']
