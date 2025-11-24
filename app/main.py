@@ -1,7 +1,14 @@
 import yaml
 from flask import Flask, request, jsonify
 import logging
-from handlers.actions import execute_script, make_api_call
+import sys
+import os
+
+# Add parent directory to path to allow importing handlers
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from handlers.actions import HANDLERS
+from adapters.http_client import ApiClientFactory
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -14,47 +21,47 @@ def load_config(config_path='config.yaml'):
         return yaml.safe_load(f)
 
 config = load_config()
+api_client_factory = ApiClientFactory()
 
-def create_endpoint_handler(actions):
+from flask import Response
+
+def create_endpoint_handler(handler_func, target_api):
     def handler():
         payload = request.json
-        results = []
-        for action in actions:
-            action_type = action.get('type')
-            if action_type == 'script':
-                command = action.get('command')
-                result = execute_script(command, payload)
-                results.append(result)
-            elif action_type == 'api':
-                url = action.get('url')
-                method = action.get('method', 'GET')
-                headers = action.get('headers', {})
-                # Use configured payload if present, otherwise forward webhook payload
-                api_payload = action.get('payload', payload) 
-                result = make_api_call(url, method, headers, payload=api_payload)
-                results.append(result)
-            else:
-                logger.warning(f"Unknown action type: {action_type}")
-        
-        return jsonify({"status": "received", "results": results}), 200
+        result = handler_func(payload, api_client_factory, target_api)
+
+        status_code = 200
+        if isinstance(result, tuple) and len(result) == 2:
+            result, status_code = result
+
+        try:
+            return jsonify(result), status_code
+        except TypeError:
+            # Fallback for non-json serializable results
+            return Response(str(result), status=status_code)
     return handler
 
 # Register routes from config
-if 'endpoints' in config:
-    for endpoint in config['endpoints']:
-        path = endpoint.get('path')
-        methods = [endpoint.get('method', 'POST')]
-        actions = endpoint.get('actions', [])
+if 'webhooks' in config:
+    for webhook_name, webhook_config in config['webhooks'].items():
+        path = webhook_config.get('path')
+        handler_name = webhook_config.get('handler')
+        target_api = webhook_config.get('target_api')
         
-        if path:
-            endpoint_name = f"handler_{path.replace('/', '_')}"
-            app.add_url_rule(path, endpoint_name, create_endpoint_handler(actions), methods=methods)
-            logger.info(f"Registered endpoint: {path} [{methods}]")
+        if path and handler_name:
+            if handler_name in HANDLERS:
+                handler_func = HANDLERS[handler_name]
+                endpoint_name = f"handler_{path.replace('/', '_')}"
+                app.add_url_rule(path, endpoint_name, create_endpoint_handler(handler_func, target_api), methods=['POST'])
+                logger.info(f"Registered endpoint: {path} -> {handler_name}")
+            else:
+                logger.error(f"Handler '{handler_name}' not found for path {path}")
 
 @app.route('/', methods=['GET'])
 def health_check():
     return jsonify({"status": "running"}), 200
 
 if __name__ == '__main__':
-    port = config.get('port', 5000)
+    server_config = config.get('server', {})
+    port = server_config.get('port', 5000)
     app.run(host='0.0.0.0', port=port)

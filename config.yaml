@@ -1,25 +1,26 @@
-# Webhook Server Configuration
+server:
+  port: 5000
 
-# Define the port the server listens on
-port: 5000
+webhooks:
+  sonarr:
+    path: /webhook/sonarr
+    handler: sonarr
+    # Optional: specify which api client to use for this webhook
+    target_api: media_server_refresh 
 
-# Define endpoints and their actions
-endpoints:
-  - path: /webhook/deploy
+  radarr:
+    path: /webhook/radarr
+    handler: radarr
+    target_api: media_server_refresh
+
+api_clients:
+  media_server_refresh:
+    url: "http://192.168.178.164:8096/Library/Refresh"
     method: POST
-    actions:
-      - type: script
-        command: "echo 'Deploying...'"
-        # You can use arguments from the payload using {key} syntax if implemented
-        # command: "./deploy.sh {branch}" 
-
-  - path: /webhook/notify
+    headers:
+      Authorization: 'MediaBrowser Token="74718914f62c426aa7de849ae2f1fdfc"'
+      Content-Type: "application/json"
+  
+  notification_service:
+    url: "https://ntfy.sh/stubenflix_alerts"
     method: POST
-    actions:
-      - type: api
-        url: "https://httpbin.org/post"
-        method: POST
-        headers:
-          Content-Type: application/json
-        payload:
-          message: "Notification received"

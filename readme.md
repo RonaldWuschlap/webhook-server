@@ -1,13 +1,12 @@
 # Webhook Server
 
-A lightweight Python server built with Flask to receive webhooks and trigger local scripts or external API calls based on the content.
+A lightweight Python server built with Flask to receive webhooks from Sonarr/Radarr and trigger external API calls.
 
 ## Features
 
-- **Configurable Endpoints**: Define routes, methods, and actions in `config.yaml`.
-- **Script Execution**: Trigger shell commands or scripts with payload data.
-- **API Forwarding**: Forward webhooks to other APIs or services.
-- **Lightweight**: Minimal dependencies (Flask, PyYAML, Requests).
+- **Sonarr & Radarr Support**: Dedicated handlers for media server events.
+- **Configurable Endpoints**: Map webhook paths to specific handlers in `config.yaml`.
+- **API Forwarding**: Trigger external APIs (e.g., Plex refresh, notifications) based on events.
 
 ## Installation
 
@@ -19,16 +18,23 @@ A lightweight Python server built with Flask to receive webhooks and trigger loc
 
 ## Configuration
 
-Edit `config.yaml` to define your endpoints. Example:
+Edit `config.yaml` to define your webhooks and API clients.
 
 ```yaml
-port: 5000
-endpoints:
-  - path: /webhook/deploy
+server:
+  port: 5000
+
+webhooks:
+  - path: /webhook/sonarr
+    handler: sonarr
+    target_api: media_server
+
+api_clients:
+  media_server:
+    url: "http://plex:32400/..."
     method: POST
-    actions:
-      - type: script
-        command: "echo 'Deploying...'"
+    headers:
+      X-Plex-Token: "YOUR_TOKEN"
 ```
 
 ## Usage
@@ -39,15 +45,9 @@ Start the server:
 python -m app.main
 ```
 
-Send a webhook:
-
-```bash
-curl -X POST http://localhost:5000/webhook/deploy -d '{"branch": "main"}'
-```
-
 ## Project Structure
 
 - `app/`: Main application code.
-- `handlers/`: Action handlers for scripts and APIs.
-- `tests/`: Verification scripts.
+- `handlers/`: Action handlers for Sonarr/Radarr.
+- `tests/`: Pytest verification scripts.
 - `config.yaml`: Configuration file.
