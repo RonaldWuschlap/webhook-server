@@ -2,10 +2,15 @@ import logging
 from handlers.push_notification_handler import handle_push_notification
 from handlers.constants import allowed_event_types, trigger_library_events
 from adapters.http_client import ApiClientFactory
+import time
+
+_last_sonarr_library_update_time = 0
+SONARR_LIBRARY_UPDATE_BUFFER_SECONDS = 300
 
 logger = logging.getLogger(__name__)
 
 def handle_sonarr(payload: dict, api_client_factory: ApiClientFactory, target_api_name: str = 'media_server'):
+    global _last_sonarr_library_update_time
     """
     Handles Sonarr webhooks.
     """
@@ -27,6 +32,12 @@ def handle_sonarr(payload: dict, api_client_factory: ApiClientFactory, target_ap
         if not client:
             logger.warning(f"Target API '{target_api_name}' not found in configuration")
             return {"status": "error", "message": "Target API configuration missing"}, 500
+
+        current_time = time.time()
+        if current_time - _last_sonarr_library_update_time < SONARR_LIBRARY_UPDATE_BUFFER_SECONDS:
+            logger.info("Sonarr library update throttled: too soon since last update.")
+            return {"status": "ignored", "message": "Library update throttled"}, 200
+        _last_sonarr_library_update_time = current_time
         
         response, status_code = client.send_request({})
         
@@ -52,6 +63,7 @@ def handle_radarr(payload: dict, api_client_factory: ApiClientFactory, target_ap
     """
     Handles Radarr webhooks.
     """
+    global _last_sonarr_library_update_time
     logger.info("Received Radarr webhook")
 
     event_type = payload.get('eventType')
@@ -71,6 +83,12 @@ def handle_radarr(payload: dict, api_client_factory: ApiClientFactory, target_ap
             logger.warning(f"Target API '{target_api_name}' not found in configuration")
             return {"status": "error", "message": "Target API configuration missing"}, 500
         
+        current_time = time.time()
+        if current_time - _last_sonarr_library_update_time < SONARR_LIBRARY_UPDATE_BUFFER_SECONDS:
+            logger.info("Sonarr library update throttled: too soon since last update.")
+            return {"status": "ignored", "message": "Library update throttled"}, 200
+        _last_sonarr_library_update_time = current_time
+
         response, status_code = client.send_request({})
         
         # Handle error responses
